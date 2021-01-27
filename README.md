@@ -14,11 +14,13 @@
 ### 用法
 ```shell
 pip3 install -r requirements.txt
-py -3.8 chika.py PATH_TO_RECORD OLD_LIB_STR
+py -3.8 chika.py PATH [-s REF_STR | -u REF_UUID]
 ```
-`PATH_TO_RECORD`是你个人记录文件的路径
+`PATH`是你个人记录文件的路径
 
-`OLD_LIB_STR`（可选）是用来同步追踪信息的图书馆导出文本
+同步追踪参数（可选）  
+`REF_STR` 图书馆导出文本  
+`REF_UUID` 图书馆导出链接  
 
 -----------------
 ### 现有问题

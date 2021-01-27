@@ -5,6 +5,8 @@ import sys
 
 import msgpack
 from Crypto.Cipher import AES
+import requests
+import argparse
 
 
 def decrypt(encrypted):
@@ -77,11 +79,16 @@ def check_trace(trace_str, unit):
     return True
 
 
-def unit_trace_sync(unit_list, ref_list):
+def make_trace_dict_from_str(ref_str):
+    ref_list = json.loads(gzip_unzip_base64(ref_str))[0]
     trace_dict = {}
-    synced_list = []
     for unit in ref_list:
         trace_dict[unit['u']] = unit['t']
+    return trace_dict
+
+
+def unit_trace_sync(unit_list, trace_dict):
+    synced_list = []
     for unit in unit_list:
         if unit['u'] in trace_dict.keys():
             if check_trace(trace_dict[unit['u']], unit):
@@ -123,13 +130,33 @@ def enc_library_dict(data):
     return gzip_zip_base64(json.dumps(data, separators=(',', ':')))
 
 
+def make_trace_dict_from_uuid(uuid):
+    uuid = uuid.strip().split('?s=')[-1]
+    ret = requests.post('https://pcredivewiki.tw/static/php/mysqlGet.php', {'uuid': uuid})
+    data = json.loads(base64.b64decode(ret.text))[0]
+    trace_dict = {}
+    for unit in data:
+        trace_dict[hex(int(unit['unit_id'][:4]))[2:]] = unit['trace']
+    return trace_dict
+
+
 if __name__ == '__main__':
-    p = sys.argv[1]
-    o = load_from_htm(p)
-    ud = unit_list_trans(o['unit_list'])
-    if len(sys.argv) > 2:
-        ref = json.loads(gzip_unzip_base64(sys.argv[2]))[0]
-        ud = unit_trace_sync(ud, ref)
-    ed = equip_list_trans(o['user_equip'])
-    e = enc_library_dict([ud, ed])
-    print(e)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path', type=str, help='path to your dump file', metavar='PATH')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('-s', type=str, help='trace reference string', metavar='REF_STR', dest='ref_s')
+    group.add_argument('-u', type=str, help='trace reference uuid', metavar='REF_UUID', dest='ref_u')
+    args = parser.parse_args()
+
+    original_data = load_from_htm(args.path)
+    unit_dict = unit_list_trans(original_data['unit_list'])
+    ref = {}
+    if args.ref_s is not None:
+        ref = make_trace_dict_from_str(args.ref_s)
+    if args.ref_u is not None:
+        ref = make_trace_dict_from_uuid(args.ref_u)
+    if ref != {}:
+        unit_dict = unit_trace_sync(unit_dict, ref)
+    equip_dict = equip_list_trans(original_data['user_equip'])
+    encoded_str = enc_library_dict([unit_dict, equip_dict])
+    print(encoded_str)
